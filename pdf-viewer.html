@@ -1,0 +1,35 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KAFV PDF 열람 전용</title><style>
+*{box-sizing:border-box}body{margin:0;background:#e9eeef;color:#18363a;font:14px system-ui,'Malgun Gothic',sans-serif}header{display:flex;align-items:center;gap:10px;justify-content:space-between;background:#fff;border-bottom:1px solid #d4e2df;padding:8px 12px;position:sticky;top:0;z-index:3}button{border:1px solid #bdcfcb;background:white;color:#134e4c;border-radius:7px;padding:7px 11px;cursor:pointer}button:disabled{opacity:.45;cursor:default}.controls{display:flex;align-items:center;gap:7px}.controls input{width:52px;text-align:center;padding:6px;border:1px solid #bdcfcb;border-radius:6px}.title{font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:28vw}main{display:flex;align-items:center;flex-direction:column;gap:12px;padding:12px}canvas{display:block;background:white;box-shadow:0 2px 14px #16343622;max-width:100%;height:auto}#msg{padding:17px;text-align:center;line-height:1.65}small{font-size:11px;color:#56706c}@media(max-width:600px){.title{max-width:85px;font-size:11px}header{gap:4px;padding:5px}.controls{gap:3px}button{padding:7px}}@media print{body{display:none}}
+</style></head><body><header><span class="title" id="docTitle">KAFV 강의자료</span><div class="controls"><button id="prev" aria-label="이전 페이지">◀</button><input id="page" type="number" min="1" value="1" aria-label="페이지 번호"><span id="total">/ —</span><button id="next" aria-label="다음 페이지">▶</button><button id="minus" aria-label="축소">−</button><button id="plus" aria-label="확대">＋</button></div><small>열람 전용</small></header><div id="msg">PDF를 불러오는 중입니다.</div><main><canvas id="canvas"></canvas></main>
+<script src="pdf-config.js"></script><script type="module">
+const $=id=>document.getElementById(id),id=new URL(location.href).searchParams.get('id');
+const origin=(window.KAFV_PDF_PROXY_ORIGIN||'').replace(/\/$/,'');
+let pdf,page=1,scale=1.15,sequence=0;
+async function show(){if(!pdf)return;const n=++sequence;
+ const p=await pdf.getPage(page),viewport=p.getViewport({scale}),canvas=$('canvas');
+ const outputScale=Math.min(window.devicePixelRatio||1,2),context=canvas.getContext('2d');
+ canvas.width=Math.floor(viewport.width*outputScale);canvas.height=Math.floor(viewport.height*outputScale);
+ canvas.style.width=Math.floor(viewport.width)+'px';canvas.style.height=Math.floor(viewport.height)+'px';
+ if(n!==sequence)return;
+ await p.render({canvasContext:context,viewport,transform:outputScale===1?null:[outputScale,0,0,outputScale,0,0]}).promise;
+ $('page').value=page;$('prev').disabled=page<=1;$('next').disabled=page>=pdf.numPages;
+}
+function error(message){$('msg').textContent=message;$('canvas').style.display='none'}
+try{
+ if(!id||!/^[a-z0-9_-]{1,64}$/i.test(id))throw new Error('올바르지 않은 문서 ID입니다.');
+ if(!origin||origin.includes('YOUR-WORKER'))throw new Error('Cloudflare Worker 주소를 설정하세요.');
+ const mod=await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs');
+ mod.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
+ const manifest=await fetch(origin+'/api/documents');if(!manifest.ok)throw new Error('문서 목록을 가져올 수 없습니다.');
+ const data=await manifest.json(),found=(data.documents||[]).find(x=>x.id===id);
+ if(!found)throw new Error('존재하지 않는 문서입니다.');
+ $('docTitle').textContent=found.name;
+ pdf=await mod.getDocument({url:origin+'/api/pdf/'+encodeURIComponent(id),withCredentials:false,disableAutoFetch:false}).promise;
+ $('total').textContent='/ '+pdf.numPages;$('page').max=pdf.numPages;$('msg').hidden=true;await show();
+}catch(e){error('PDF를 표시할 수 없습니다: '+e.message)}
+$('prev').onclick=()=>{if(page>1){page--;show()}};
+$('next').onclick=()=>{if(pdf&&page<pdf.numPages){page++;show()}};
+$('page').onchange=()=>{if(pdf){page=Math.max(1,Math.min(pdf.numPages,parseInt($('page').value)||1));show()}};
+$('minus').onclick=()=>{scale=Math.max(.6,scale-.2);show()};
+$('plus').onclick=()=>{scale=Math.min(3,scale+.2);show()};
+</script></body></html>
