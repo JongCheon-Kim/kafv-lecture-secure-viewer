@@ -1,5 +1,5 @@
 /* KAFV lecture PWA app shell. Remote Cloudflare PDF files are never cached. */
-const CACHE_NAME = 'kafv-lecture-pwa-v3-20261120-pc-pdfjs-cover';
+const CACHE_NAME = 'kafv-lecture-pwa-v211-20261120-mobile-pdf-fullscreen';
 const CACHE_PREFIX = 'kafv-lecture-pwa-';
 const APP_SHELL = [
   './index.html', './manifest.webmanifest',
